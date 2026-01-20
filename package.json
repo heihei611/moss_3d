@@ -1,0 +1,10 @@
+{
+  "name": "moss3d",
+  "version": "1.0.0",
+  "description": "苔境 Taijing - 定制你的专属微景观",
+  "scripts": {
+    "build": "echo 'No build needed'"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
