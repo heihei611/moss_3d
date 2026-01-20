@@ -1678,14 +1678,21 @@
                             console.log('✓ 3D模型生成成功！');
                             console.log('📦 输出数据结构:', statusData.data.output);
                             
-                            const modelUrl = statusData.data.output?.model || statusData.data.output?.glb || statusData.data.output?.pbr?.model;
-                            const renderUrl = statusData.data.output?.rendered_image || statusData.data.output?.preview;
+                            // 兼容多种可能的字段名
+                            const modelUrl = statusData.data.output?.pbr_model?.model_url 
+                                          || statusData.data.output?.pbr_model 
+                                          || statusData.data.output?.model 
+                                          || statusData.data.output?.glb;
+                            
+                            const renderUrl = statusData.data.output?.rendered_image?.url
+                                           || statusData.data.output?.rendered_image
+                                           || statusData.data.output?.preview;
                             
                             console.log('  GLB模型URL:', modelUrl);
                             console.log('  渲染预览图:', renderUrl);
                             
                             if (!modelUrl) {
-                                console.error('⚠️ 警告：未找到模型URL！完整数据:', statusData.data.output);
+                                console.error('⚠️ 警告：未找到模型URL！完整数据:', JSON.stringify(statusData.data.output, null, 2));
                                 throw new Error('API返回成功但未找到模型下载链接');
                             }
                             
