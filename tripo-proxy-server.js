@@ -5,7 +5,7 @@ const http = require('http');
 const https = require('https');
 
 const PORT = 3000;
-const TRIPO_API_KEY = 'tsk_1hogTAujjDaKOQKdvI8WfU6xbMQrjyaikT2Jzr4Frmj'; // 👈 在这里填写你的API密钥
+const TRIPO_API_KEY = 'tsk_H6syaytV6_1zfnIw1DyxM27r6MyHeuQYVMoxq7G-eB7'; // 👈 在这里填写你的API密钥
 
 const server = http.createServer((req, res) => {
     // 设置CORS头

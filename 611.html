@@ -150,12 +150,10 @@
     <script>
         // --- Tripo AI 配置 ---
         const TRIPO_CONFIG = {
-            // 自动检测环境：本地开发用localhost，线上用相对路径
-            baseUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? 'http://localhost:3000/api'  // 本地开发
-                : '/api',  // 线上部署（Netlify Functions）
+            // 本地代理服务器地址
+            baseUrl: 'http://localhost:3000/api',  // 使用本地Node.js代理
             // 2D转3D的提示词配置 👇
-            defaultPrompt: '基于苔藓微景观设计，保持自然质感和细节，适合3D打印和CNC加工',
+            defaultPrompt: 'Moss terrarium art with high-relief 3D surface, rich organic texture details, varied depth layers, tactile natural moss patterns, realistic stone and wood grain, detailed micro-topography, suitable for 3D printing with surface complexity',
             // 模型生成参数 👇
             modelParams: {
                 mode: 'refine',  // 精细模式 (或 'preview' 快速预览)
@@ -1664,20 +1662,22 @@
                         }
                         
                         // 使用更小的blob
-                        var uploadBlob = smallerBlob;
+                        var finalImage = moreCompressed;
                     } else {
-                        var uploadBlob = blob;
+                        var finalImage = compressedImage;
                     }
                     
                     statusDiv.innerHTML = '<p class="text-blue-600"><i class="fa-solid fa-clock mr-2"></i>步骤1/3: 上传图片到Tripo AI...</p>';
                     
-                    // 1. 上传图片
-                    const uploadFormData = new FormData();
-                    uploadFormData.append('file', uploadBlob, 'design.jpg');
+                    // 1. 上传图片（本地服务器用FormData）
+                    const blob = await (await fetch(finalImage)).blob();
+                    const formData = new FormData();
+                    formData.append('file', blob, 'design.jpg');
                     
                     const uploadResponse = await fetch(`${TRIPO_CONFIG.baseUrl}/upload`, {
                         method: 'POST',
-                        body: uploadFormData
+                        body: formData  // 本地代理支持multipart
+                    });
                     });
 
                     if (!uploadResponse.ok) {
@@ -1733,7 +1733,7 @@
                             console.log('✓ 3D模型生成成功！');
                             console.log('📦 输出数据结构:', statusData.data.output);
                             
-                            const modelUrl = statusData.data.output?.model || statusData.data.output?.glb || statusData.data.output?.pbr?.model;
+                            const modelUrl = statusData.data.output?.model || statusData.data.output?.glb || statusData.data.output?.pbr_model || statusData.data.output?.pbr?.model;
                             const renderUrl = statusData.data.output?.rendered_image || statusData.data.output?.preview;
                             
                             console.log('  GLB模型URL:', modelUrl);
@@ -1745,35 +1745,78 @@
                             }
                             
                             statusDiv.innerHTML = `
-                                <p class="text-green-600 mb-4"><i class="fa-solid fa-check-circle mr-2"></i>3D模型生成成功！</p>
-                                <div class="flex gap-2 justify-center flex-wrap mb-3">
+                                <div class="text-center mb-6 animate-fade-in">
+                                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100 mb-4">
+                                        <i class="fa-solid fa-check text-3xl text-emerald-600"></i>
+                                    </div>
+                                    <h3 class="text-2xl font-bold text-emerald-900 mb-2 serif">3D模型生成成功！</h3>
+                                    <p class="text-stone-500">您的微景观3D模型已准备就绪</p>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                                     ${modelUrl ? `
-                                    <button onclick="app.downloadModel('${modelUrl}', 'taijing_3d_model.glb')" 
-                                       class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition shadow-md">
-                                        <i class="fa-solid fa-download mr-2"></i>下载GLB模型
-                                    </button>
-                                    <a href="${modelUrl}" target="_blank" download="taijing_3d_model.glb"
-                                       class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition inline-flex items-center shadow-md">
-                                        <i class="fa-solid fa-external-link mr-2"></i>备用下载
-                                    </a>
-                                    ` : '<p class="text-red-500">模型URL未找到</p>'}
+                                    <div class="bg-white rounded-xl p-6 border-2 border-emerald-200 hover:border-emerald-400 transition-all shadow-sm hover:shadow-md">
+                                        <div class="flex items-center mb-3">
+                                            <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center mr-3">
+                                                <i class="fa-solid fa-cube text-emerald-600"></i>
+                                            </div>
+                                            <div>
+                                                <h4 class="font-bold text-stone-800">GLB 3D模型</h4>
+                                                <p class="text-xs text-stone-500">可用于3D打印</p>
+                                            </div>
+                                        </div>
+                                        <button onclick="app.downloadModel('${modelUrl}', 'taijing_3d_model.glb')" 
+                                           class="w-full px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition shadow-md hover:shadow-lg transform hover:scale-105 font-medium">
+                                            <i class="fa-solid fa-download mr-2"></i>下载模型文件
+                                        </button>
+                                    </div>
+                                    ` : ''}
+                                    
                                     ${renderUrl ? `
-                                    <button onclick="window.open('${renderUrl}', '_blank')" 
-                                       class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md">
-                                        <i class="fa-solid fa-image mr-2"></i>查看渲染图
-                                    </button>
+                                    <div class="bg-white rounded-xl p-6 border-2 border-blue-200 hover:border-blue-400 transition-all shadow-sm hover:shadow-md">
+                                        <div class="flex items-center mb-3">
+                                            <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-3">
+                                                <i class="fa-solid fa-image text-blue-600"></i>
+                                            </div>
+                                            <div>
+                                                <h4 class="font-bold text-stone-800">渲染预览图</h4>
+                                                <p class="text-xs text-stone-500">高清效果预览</p>
+                                            </div>
+                                        </div>
+                                        <button onclick="window.open('${renderUrl}', '_blank')" 
+                                           class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md hover:shadow-lg transform hover:scale-105 font-medium">
+                                            <i class="fa-solid fa-eye mr-2"></i>查看渲染图
+                                        </button>
+                                    </div>
                                     ` : ''}
                                 </div>
-                                <div class="bg-stone-50 rounded-lg p-3 text-left text-xs">
-                                    <p class="text-stone-600 mb-2"><strong>📥 下载说明：</strong></p>
-                                    <ul class="text-stone-500 space-y-1 ml-4">
-                                        <li>• <strong>下载GLB模型</strong>：自动触发浏览器下载</li>
-                                        <li>• <strong>备用下载</strong>：如果自动下载失败，点击此按钮后右键"另存为"</li>
-                                        <li>• 文件保存位置：<code class="bg-white px-1 rounded">C:\\Users\\你的用户名\\Downloads\\taijing_3d_model.glb</code></li>
-                                        ${!modelUrl ? '<li class="text-red-500">⚠️ 模型URL未找到，请查看控制台（F12）获取详细信息</li>' : ''}
-                                    </ul>
-                                    ${modelUrl ? `<p class="text-stone-400 mt-2 text-[10px]">💡 模型URL: <span class="break-all">${modelUrl}</span></p>` : ''}
+                                
+                                ${modelUrl ? `
+                                <div class="bg-gradient-to-r from-stone-50 to-emerald-50 rounded-xl p-4 border border-stone-200">
+                                    <div class="flex items-start">
+                                        <i class="fa-solid fa-lightbulb text-amber-500 text-xl mr-3 mt-1"></i>
+                                        <div class="flex-1 text-sm">
+                                            <p class="font-bold text-stone-700 mb-2">下载说明</p>
+                                            <ul class="text-stone-600 space-y-1.5">
+                                                <li class="flex items-start">
+                                                    <i class="fa-solid fa-check text-emerald-600 text-xs mr-2 mt-1"></i>
+                                                    <span>点击<strong class="text-emerald-700">「下载模型文件」</strong>将自动保存到下载文件夹</span>
+                                                </li>
+                                                <li class="flex items-start">
+                                                    <i class="fa-solid fa-check text-emerald-600 text-xs mr-2 mt-1"></i>
+                                                    <span>文件格式为 <code class="bg-white px-2 py-0.5 rounded text-xs border">GLB</code>，适用于大多数3D软件和打印服务</span>
+                                                </li>
+                                                <li class="flex items-start">
+                                                    <i class="fa-solid fa-check text-emerald-600 text-xs mr-2 mt-1"></i>
+                                                    <span>保存位置：<code class="bg-white px-2 py-0.5 rounded text-xs border">C:\\Users\\你的用户名\\Downloads\\</code></span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
                                 </div>
+                                ` : ''}
+                                
+                                ${!modelUrl ? '<div class="text-center py-8"><p class="text-red-500 font-medium"><i class="fa-solid fa-exclamation-triangle mr-2"></i>模型URL未找到，请查看控制台获取详细信息</p></div>' : ''}
                             `;
                             btn.innerHTML = '<i class="fa-solid fa-cube mr-2"></i>重新生成3D';
                             btn.disabled = false;
@@ -1838,17 +1881,23 @@
                         </div>
 
                         <!-- 3D生成区域 -->
-                        <div class="bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-2xl shadow-lg mb-6 border border-blue-200">
-                            <h3 class="font-bold text-lg mb-2 flex items-center">
-                                <i class="fa-solid fa-cube mr-2 text-blue-600"></i>
-                                AI 3D模型生成 (Powered by Tripo AI)
-                            </h3>
-                            <p class="text-sm text-stone-600 mb-4">将你的2D设计图转换为可用于3D打印的模型文件</p>
-                            <div id="tripo-status" class="mb-4 min-h-[50px] flex items-center justify-center">
-                                <p class="text-stone-400">点击下方按钮开始生成3D模型</p>
+                        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 p-8 rounded-2xl shadow-lg mb-6 border-2 border-emerald-200 relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-500 to-teal-500"></div>
+                            <div class="flex items-center mb-4">
+                                <div class="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mr-4">
+                                    <i class="fa-solid fa-cube text-2xl text-emerald-600"></i>
+                                </div>
+                                <div class="text-left">
+                                    <h3 class="font-bold text-xl text-emerald-900 serif">AI 3D模型生成</h3>
+                                    <p class="text-xs text-stone-500">Powered by Tripo AI</p>
+                                </div>
+                            </div>
+                            <p class="text-sm text-stone-600 mb-6">将你的2D设计图转换为可用于3D打印的GLB模型文件</p>
+                            <div id="tripo-status" class="mb-6 min-h-[50px] flex items-center justify-center bg-white/50 rounded-lg p-4">
+                                <p class="text-stone-400 text-sm"><i class="fa-solid fa-info-circle mr-2"></i>点击下方按钮开始生成3D模型</p>
                             </div>
                             <button id="generate3d-btn" onclick="app.generateTripo3D(appState.generatedImageUrl)" 
-                                    class="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-lg hover:shadow-xl transition transform hover:scale-105">
+                                    class="w-full px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg shadow-lg hover:shadow-xl transition-all transform hover:scale-105 font-bold tracking-wide">
                                 <i class="fa-solid fa-cube mr-2"></i>生成3D模型
                             </button>
                         </div>
