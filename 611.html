@@ -1664,80 +1664,66 @@
                     
                     const checkStatus = async () => {
                         const statusResponse = await fetch(`${TRIPO_CONFIG.baseUrl}/task/${taskId}`);
-
                         const statusData = await statusResponse.json();
-                        console.log('📊 完整状态数据:', JSON.stringify(statusData, null, 2));
                         
-                        const status = statusData.data?.status;
+                        console.log('📊 任务状态:', statusData.data?.status);
 
-                        if (status === 'success') {
-                            // 生成成功
-                            appState.generated3DModel = statusData.data.output;
-                            
-                            // 详细检查输出数据
-                            console.log('✓ 3D模型生成成功！');
-                            console.log('📦 输出数据结构:', statusData.data.output);
-                            
-                            // pbr_model 和 rendered_image 直接就是URL字符串
-                            const modelUrl = statusData.data.output?.pbr_model 
-                                          || statusData.data.output?.model 
-                                          || statusData.data.output?.glb;
-                            
-                            const renderUrl = statusData.data.output?.rendered_image
-                                           || statusData.data.output?.preview;
-                            
-                            console.log('  GLB模型URL:', modelUrl);
-                            console.log('  渲染预览图:', renderUrl);
-                            
+                        if (statusData.data?.status === 'success') {
+                            // --- 修复开始 ---
+                            const output = statusData.data.output;
+                            console.log('📦 API返回的原始数据:', output);
+
+                            // 【核心修复】强制按顺序检查所有可能的字段名
+                            // Tripo API 有时返回 pbr_model, 有时返回 model
+                            let modelUrl = output.pbr_model || output.model || output.glb;
+                            let renderUrl = output.rendered_image || output.image;
+
+                            console.log('🎯 提取到的模型URL:', modelUrl);
+
                             if (!modelUrl) {
-                                console.error('⚠️ 警告：未找到模型URL！完整数据:', JSON.stringify(statusData.data.output, null, 2));
-                                throw new Error('API返回成功但未找到模型下载链接');
+                                console.error('❌ 字段提取失败，现有字段:', Object.keys(output));
+                                throw new Error('API返回成功，但在 output 中未找到 pbr_model 或 model 字段');
                             }
-                            
+
+                            // 保存到全局状态
+                            appState.generated3DModel = output;
+
+                            // 更新 UI 显示成功状态
                             statusDiv.innerHTML = `
-                                <p class="text-green-600 mb-4"><i class="fa-solid fa-check-circle mr-2"></i>3D模型生成成功！</p>
-                                <div class="flex gap-2 justify-center flex-wrap mb-3">
-                                    ${modelUrl ? `
-                                    <button onclick="app.downloadModel('${modelUrl}', 'taijing_3d_model.glb')" 
-                                       class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition shadow-md">
-                                        <i class="fa-solid fa-download mr-2"></i>下载GLB模型
-                                    </button>
-                                    <a href="${modelUrl}" target="_blank" download="taijing_3d_model.glb"
-                                       class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition inline-flex items-center shadow-md">
-                                        <i class="fa-solid fa-external-link mr-2"></i>备用下载
-                                    </a>
-                                    ` : '<p class="text-red-500">模型URL未找到</p>'}
-                                    ${renderUrl ? `
-                                    <button onclick="window.open('${renderUrl}', '_blank')" 
-                                       class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md">
-                                        <i class="fa-solid fa-image mr-2"></i>查看渲染图
-                                    </button>
-                                    ` : ''}
-                                </div>
-                                <div class="bg-stone-50 rounded-lg p-3 text-left text-xs">
-                                    <p class="text-stone-600 mb-2"><strong>📥 下载说明：</strong></p>
-                                    <ul class="text-stone-500 space-y-1 ml-4">
-                                        <li>• <strong>下载GLB模型</strong>：自动触发浏览器下载</li>
-                                        <li>• <strong>备用下载</strong>：如果自动下载失败，点击此按钮后右键"另存为"</li>
-                                        <li>• 文件保存位置：<code class="bg-white px-1 rounded">C:\\Users\\你的用户名\\Downloads\\taijing_3d_model.glb</code></li>
-                                        ${!modelUrl ? '<li class="text-red-500">⚠️ 模型URL未找到，请查看控制台（F12）获取详细信息</li>' : ''}
-                                    </ul>
-                                    ${modelUrl ? `<p class="text-stone-400 mt-2 text-[10px]">💡 模型URL: <span class="break-all">${modelUrl}</span></p>` : ''}
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-4 animate-fade-in">
+                                    <p class="text-green-700 font-bold mb-2"><i class="fa-solid fa-check-circle mr-2"></i>3D模型生成成功！</p>
+                                    <div class="flex flex-wrap gap-3 mt-3">
+                                        <button onclick="app.downloadModel('${modelUrl}', 'taijing_moss_3d.glb')" 
+                                           class="px-5 py-2 bg-emerald-600 text-white rounded shadow hover:bg-emerald-700 transition flex items-center">
+                                            <i class="fa-solid fa-download mr-2"></i>下载 GLB 模型
+                                        </button>
+                                        ${renderUrl ? `
+                                        <a href="${renderUrl}" target="_blank" 
+                                           class="px-5 py-2 bg-blue-100 text-blue-700 rounded shadow hover:bg-blue-200 transition flex items-center">
+                                            <i class="fa-solid fa-image mr-2"></i>查看渲染图
+                                        </a>` : ''}
+                                    </div>
+                                    <div class="mt-3 text-xs text-stone-500 break-all bg-white p-2 rounded border border-stone-100">
+                                        <strong>调试链接:</strong> ${modelUrl}
+                                    </div>
                                 </div>
                             `;
-                            btn.innerHTML = '<i class="fa-solid fa-cube mr-2"></i>重新生成3D';
+                            
+                            btn.innerHTML = '<i class="fa-solid fa-cube mr-2"></i>重新生成';
                             btn.disabled = false;
                             appState.is3DGenerating = false;
-                        } else if (status === 'failed') {
-                            throw new Error('3D模型生成失败');
+                            // --- 修复结束 ---
+
+                        } else if (statusData.data?.status === 'failed') {
+                            throw new Error('Tripo API 报告任务失败');
                         } else {
-                            // 继续等待
+                            // 继续轮询
                             attempts++;
                             if (attempts >= maxAttempts) {
                                 throw new Error('生成超时，请重试');
                             }
-                            statusDiv.innerHTML = `<p class="text-blue-600"><i class="fa-solid fa-clock mr-2"></i>步骤3/3: 处理中... (${attempts * 5}秒)</p>`;
-                            setTimeout(checkStatus, 5000); // 每5秒检查一次
+                            statusDiv.innerHTML = `<p class="text-blue-600"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i>AI 正在构建模型... (${attempts * 2}s)</p>`;
+                            setTimeout(checkStatus, 2000); // 建议缩短轮询间隔到 2秒，反应更快
                         }
                     };
 
